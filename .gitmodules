@@ -1,3 +1,0 @@
-[submodule "evaluation_framework"]
-  path = evaluation_framework
-  ulr = git@gitlab.com:BI_Koeln/Algorithm2Domain_EvaluationFramework.git
