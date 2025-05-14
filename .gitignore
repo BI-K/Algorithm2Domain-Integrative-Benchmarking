@@ -1,0 +1,11 @@
+original_dataset/
+!ADATime_data/OHIO/
+ADATime_data/
+ADATime/
+.DS_Store
+__pycache__/
+*.pyc
+app_copy.py
+main_app copy.py
+experiments_logs/*
+wandb/*
