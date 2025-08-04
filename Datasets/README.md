@@ -2,6 +2,10 @@
 
 This folder contains scripts that help you turn time-series datasets into the format required by the Algorithm2Domain Evaluation Framework.
 
+## Preprocessing Scripts for the following Datasets
+- [OHIOT1DM](https://webpages.charlotte.edu/rbunescu/data/ohiot1dm/OhioT1DM-dataset.html)
+- [WEATHER - Kaggle: Hourly energy demand generation and weather](https://www.kaggle.com/datasets/nicholasjhana/energy-consumption-generation-prices-and-weather?select=weather_features.csv)
+
 ## Work in progress
 [Algorithm2Domain](https://github.com/BI-K/Algorithm2Domain) is  a meta-repository for benchmarking of domain adaptation performance managed by the [Institute for Biomedical Informatics](https://bik.uni-koeln.de/) (University Hospital of Cologne).
 Our goal is to aggregate existing algorithms and benchmarking suits, and develop integrative pipelines for mix-and-match cross-domain benchmarking. The data sources suitable for the benchmarking will be aggregated as pointers. 
