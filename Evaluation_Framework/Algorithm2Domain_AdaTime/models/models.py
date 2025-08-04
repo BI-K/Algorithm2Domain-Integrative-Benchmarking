@@ -6,7 +6,8 @@ from torch.nn.utils import weight_norm
 import torch.nn.functional as F
 from .resnet18 import resnet18
 
-
+from .liquid_time_constant_network import LTCN, CfCN
+from .hinrichs_models import GRUHinrichs, TransformerHinrichs
 # from utils import weights_init
 
 def get_backbone_class(backbone_name):
@@ -55,23 +56,24 @@ class CNN(nn.Module):
         x = self.conv_block1(x_in)
         x = self.conv_block2(x)
         x = self.conv_block3(x)
-        x = self.adaptive_pool(x)
+        x = self.adaptive_pool(x.to('cpu') if x.is_mps else x).to(x.device)
 
         x_flat = x.reshape(x.shape[0], -1)
         return x_flat
 
 
+##########################################################################
 
 class classifier(nn.Module):
     def __init__(self, configs):
         super(classifier, self).__init__()
+        if configs.num_cont_output_channels > 0:
+            configs.num_classes = configs.num_cont_output_channels
         self.logits = nn.Linear(configs.features_len * configs.final_out_channels, configs.num_classes)
         self.configs = configs
 
     def forward(self, x):
-
         predictions = self.logits(x)
-
         return predictions
 
 
@@ -94,7 +96,7 @@ class TCN(nn.Module):
         super(TCN, self).__init__()
 
         in_channels0 = configs.input_channels
-        out_channels0 = configs.tcn_layers[1]
+        out_channels0 = configs.tcn_layers[0]
         kernel_size = configs.tcn_kernel_size
         stride = 1
         dilation0 = 1
@@ -113,7 +115,7 @@ class TCN(nn.Module):
         self.relu = nn.ReLU()
 
         in_channels1 = configs.tcn_layers[0]
-        out_channels1 = configs.tcn_layers[1]
+        out_channels1 = configs.features_len * configs.final_out_channels
         dilation1 = 2
         padding1 = (kernel_size - 1) * dilation1
         self.net1 = nn.Sequential(
@@ -122,8 +124,7 @@ class TCN(nn.Module):
             nn.Conv1d(out_channels1, out_channels1, kernel_size, stride=stride, padding=padding1, dilation=dilation1),
             nn.ReLU(),
         )
-        self.downsample1 = nn.Conv1d(out_channels1, out_channels1, 1) if in_channels1 != out_channels1 else None
-
+        
         self.conv_block1 = nn.Sequential(
             nn.Conv1d(in_channels0, out_channels0, kernel_size=kernel_size, stride=stride, bias=False, padding=padding0,
                       dilation=dilation0),
@@ -152,6 +153,9 @@ class TCN(nn.Module):
             nn.ReLU(),
         )
 
+        self.downsample1 = nn.Conv1d(in_channels1, out_channels1, 1) if in_channels1 != out_channels1 else None
+
+
     def forward(self, inputs):
         """Inputs have to have dimension (N, C_in, L_in)"""
         x0 = self.conv_block1(inputs)
@@ -161,10 +165,9 @@ class TCN(nn.Module):
         x1 = self.conv_block2(out_0)
         res1 = out_0 if self.downsample1 is None else self.downsample1(out_0)
         out_1 = self.relu(x1 + res1)
-
         out = out_1[:, :, -1]
         return out
-
+    
 
 ######## RESNET ##############################################
 

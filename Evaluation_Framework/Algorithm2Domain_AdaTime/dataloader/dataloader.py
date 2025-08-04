@@ -5,13 +5,14 @@ from torchvision import transforms
 
 from sklearn.model_selection import train_test_split
 
+from ..dataloader.data_augmenter import augment_dataset
 import os, sys
 import numpy as np
 import random
 
 
 class Load_Dataset(Dataset):
-    def __init__(self, dataset, dataset_configs):
+    def __init__(self, dataset, dataset_configs, dtype, is_source):
         super().__init__()
         self.num_channels = dataset_configs.input_channels
 
@@ -35,10 +36,15 @@ class Load_Dataset(Dataset):
         elif len(x_data.shape) == 3 and x_data.shape[1] != self.num_channels:
             x_data = x_data.transpose(1, 2)
 
+        if dtype == "train":
+            x_data, y_data = augment_dataset(self, dataset_configs, x_data, y_data, is_source=is_source)
+
+
         # Normalize data
         if dataset_configs.normalize:
             data_mean = torch.mean(x_data, dim=(0, 2))
             data_std = torch.std(x_data, dim=(0, 2))
+            # data_std = torch.where(data_std == 0, torch.tensor(1e-7), data_std)
             self.transform = transforms.Normalize(mean=data_mean, std=data_std)
         else:
             self.transform = None
@@ -58,12 +64,12 @@ class Load_Dataset(Dataset):
         return self.len
 
 
-def data_generator(data_path, domain_id, dataset_configs, hparams, dtype):
+def data_generator(data_path, domain_id, dataset_configs, hparams, dtype, is_source):
     # loading dataset file from path
-    dataset_file = torch.load(os.path.join(data_path, f"{dtype}_{domain_id}.pt"))
+    dataset_file = torch.load(os.path.join(data_path, f"{dtype}_{domain_id}.pt"), weights_only=False)
 
     # Loading datasets
-    dataset = Load_Dataset(dataset_file, dataset_configs)
+    dataset = Load_Dataset(dataset_file, dataset_configs, dtype=dtype, is_source=is_source)
 
     if dtype == "test":  # you don't need to shuffle or drop last batch while testing
         shuffle  = False
@@ -71,7 +77,6 @@ def data_generator(data_path, domain_id, dataset_configs, hparams, dtype):
     else:
         shuffle = dataset_configs.shuffle
         drop_last = dataset_configs.drop_last
-
     # Dataloaders
     data_loader = torch.utils.data.DataLoader(dataset=dataset, 
                                               batch_size=hparams["batch_size"],
@@ -120,7 +125,7 @@ def few_shot_data_generator(data_loader, dataset_configs, num_samples=5):
     selected_y = torch.cat([y_data[samples_ids[i][selected_ids[i]]] for i in range(NUM_CLASSES)], dim=0)
 
     few_shot_dataset = {"samples": selected_x, "labels": selected_y}
-    few_shot_dataset = Load_Dataset(few_shot_dataset, dataset_configs)
+    few_shot_dataset = Load_Dataset(few_shot_dataset, dataset_configs, dtype="test", is_source=True)
 
     few_shot_loader = torch.utils.data.DataLoader(dataset=few_shot_dataset, batch_size=len(few_shot_dataset),
                                                   shuffle=False, drop_last=False, num_workers=0)

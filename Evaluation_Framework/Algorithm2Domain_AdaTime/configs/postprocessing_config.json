@@ -1,0 +1,17 @@
+{
+    "postprocessing_steps": [
+        {
+            "output_channel": 0,
+            "steps": {
+                "type": "interval_to_label",
+                "step": 0,
+                "params": {
+                    "intervals": [
+                        {"start": 0, "end": 10, "label": 0},
+                        {"start": 10, "end": 20, "label": 1}
+                    ]
+                }
+            }
+        }
+    ]
+}

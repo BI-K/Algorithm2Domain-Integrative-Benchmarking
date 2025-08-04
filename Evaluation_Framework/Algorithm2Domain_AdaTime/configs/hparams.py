@@ -1,4 +1,4 @@
-## The cuurent hyper-parameters values are not necessarily the best ones for a specific risk.
+## The curent hyper-parameters values are not necessarily the best ones for a specific risk.
 def get_hparams_class(dataset_name):
     """Return the algorithm class with the given name."""
     if dataset_name not in globals():
@@ -43,7 +43,9 @@ class HAR():
                 "domain_loss_wt": 2.943729820531079,
                 "learning_rate": 0.001,
                 "src_cls_loss_wt": 5.1390077646202,
-                "weight_decay": 0.0001
+                "weight_decay": 0.0001,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
             },
             "DIRT": {
                 "cond_ent_wt": 1.20721518968644,
@@ -142,7 +144,9 @@ class EEG():
                 "domain_loss_wt": 0.27634197975549135,
                 "learning_rate": 0.0005,
                 "src_cls_loss_wt": 8.441929209893459,
-                "weight_decay": 0.0001
+                "weight_decay": 0.0001,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
             },
             "DDC": {
                 "learning_rate": 0.0005,
@@ -231,7 +235,9 @@ class WISDM():
                 "domain_loss_wt": 2.6051391453662873,
                 "learning_rate": 0.005,
                 "src_cls_loss_wt": 5.272383517138417,
-                "weight_decay": 0.0001
+                "weight_decay": 0.0001,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
             },
             "DIRT": {
                 "cond_ent_wt": 1.6935884891647972,
@@ -291,18 +297,231 @@ class WISDM():
                 'trg_entropy_weight': 0.05}
         }
 
+class OHIO():
+    def __init__(self):
+        super(OHIO, self).__init__()
+        self.train_params = {
+            "num_epochs": 10,
+            "batch_size": 32,
+            "weight_decay": 1e-4,
+            "step_size": 50,
+            "lr_decay": 0.5
+        }
+        self.alg_hparams = {
+            "NO_ADAPT":    {"learning_rate": 1e-3, "src_cls_loss_wt": 1},
+            "TARGET_ONLY": {"learning_rate": 1e-3, "trg_cls_loss_wt": 1},
+            "SASA": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "DDC": {
+                "learning_rate": 1e-3,
+                "mmd_wt": 1.0,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "CoDATS": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "DANN": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
+            },
+            "DIRT": {
+                "cond_ent_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "vat_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "DSAN": {
+                "learning_rate": 1e-3,
+                "mmd_wt": 1.0,
+                "src_cls_loss_wt": 1e-3,
+                "domain_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "MMDA": {
+                "cond_ent_wt": 1.0,
+                "coral_wt": 1.0,
+                "learning_rate": 1e-3,
+                "mmd_wt": 1.0,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "Deep_Coral": {
+                "coral_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "CDAN": {
+                "cond_ent_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "AdvSKM": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "HoMM": {
+                "hommd_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "CoTMix": {
+                "learning_rate": 1e-3,
+                "mix_ratio": 0.5,
+                "temporal_shift": 14,
+                "src_cls_weight": 1.0,
+                "src_supCon_weight": 0.1,
+                "trg_cont_weight": 0.1,
+                "trg_entropy_weight": 0.05
+            },
+            "MCD": {
+                "learning_rate": 1e-2,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0
+            }
+        }
+
+
+class WEATHER():
+    def __init__(self):
+        super(WEATHER, self).__init__()
+        self.train_params = {
+            "num_epochs": 10,
+            "batch_size": 32,
+            "weight_decay": 1e-4,
+            "step_size": 50,
+            "lr_decay": 0.5
+        }
+        self.alg_hparams = {
+            "NO_ADAPT":    {"learning_rate": 1e-3, "src_cls_loss_wt": 1},
+            "TARGET_ONLY": {"learning_rate": 1e-3, "trg_cls_loss_wt": 1},
+            "SASA": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "DDC": {
+                "learning_rate": 1e-3,
+                "mmd_wt": 1.0,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "CoDATS": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "DANN": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
+            },
+            "DIRT": {
+                "cond_ent_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "vat_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "DSAN": {
+                "learning_rate": 1e-3,
+                "mmd_wt": 1.0,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "MMDA": {
+                "cond_ent_wt": 1.0,
+                "coral_wt": 1.0,
+                "learning_rate": 1e-3,
+                "mmd_wt": 1.0,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "Deep_Coral": {
+                "coral_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "CDAN": {
+                "cond_ent_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "AdvSKM": {
+                "domain_loss_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1e-4,
+                "weight_decay": 1e-4
+            },
+            "HoMM": {
+                "hommd_wt": 1.0,
+                "learning_rate": 1e-3,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0,
+                "weight_decay": 1e-4
+            },
+            "CoTMix": {
+                "learning_rate": 1e-3,
+                "mix_ratio": 0.5,
+                "temporal_shift": 14,
+                "src_cls_weight": 1.0,
+                "src_supCon_weight": 0.1,
+                "trg_cont_weight": 0.1,
+                "trg_entropy_weight": 0.05
+            },
+            "MCD": {
+                "learning_rate": 1e-2,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0
+            }
+        }
+
 
 class HHAR():
     def __init__(self):
         super().__init__()
         self.train_params = {
-            'num_epochs': 40,
+            'num_epochs': 1,
             'batch_size': 32,
             'weight_decay': 1e-4,
+            'step_size': 50,
+            'lr_decay': 0.5
         }
         self.alg_hparams = {
-            'NO_ADAPT': {'learning_rate': 1e-3, 'src_cls_loss_wt': 1},
-            'TARGET_ONLY': {'learning_rate': 1e-3, 'trg_cls_loss_wt': 1},
+            'NO_ADAPT': {'learning_rate': 1e-3, 'src_cls_loss_wt': 1}, # ok
+            'TARGET_ONLY': {'learning_rate': 1e-3, 'trg_cls_loss_wt': 1}, # ok
 
             "SASA": {
                 "domain_loss_wt": 5.760124609738364,
@@ -362,7 +581,9 @@ class HHAR():
                 "domain_loss_wt": 1.0296390274908802,
                 "learning_rate": 0.0005,
                 "src_cls_loss_wt": 2.038458138479581,
-                "weight_decay": 0.0001
+                "weight_decay": 0.0001,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
             },
             "Deep_Coral": {
                 "coral_wt": 5.9357031653707475,
@@ -380,8 +601,12 @@ class HHAR():
             },
             'CoTMix': {'learning_rate': 0.001, 'mix_ratio': 0.52, 'temporal_shift': 14,
                        'src_cls_weight': 0.8, 'src_supCon_weight': 0.1, 'trg_cont_weight': 0.1,
-                       'trg_entropy_weight': 0.05}
-
+                       'trg_entropy_weight': 0.05}, # ok,
+            "MCD": {
+                "learning_rate": 1e-2,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0
+            }
         }
 
 
@@ -468,9 +693,116 @@ class FD():
                 "domain_loss_wt": 5.221878412210977,
                 "learning_rate": 0.001,
                 "src_cls_loss_wt": 4.233865748743297,
-                "weight_decay": 0.0001
+                "weight_decay": 0.0001,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
             },
             'CoTMix': {'learning_rate': 0.001, 'mix_ratio': 0.52, 'temporal_shift': 14,
                        'src_cls_weight': 0.8, 'src_supCon_weight': 0.1, 'trg_cont_weight': 0.1,
-                       'trg_entropy_weight': 0.05}
+                       'trg_entropy_weight': 0.05},
+            "MCD": {
+                "learning_rate": 1e-2,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0
+            }
+        }
+
+
+class PHD():
+    def __init__(self):
+        super().__init__()
+        self.train_params = {
+            'num_epochs': 1,
+            'batch_size': 32,
+            'weight_decay': 1e-4,
+            'step_size': 50,
+            'lr_decay': 0.5
+        }
+        self.alg_hparams = {
+            'NO_ADAPT': {'learning_rate': 1e-3, 'src_cls_loss_wt': 1},
+            'TARGET_ONLY': {'learning_rate': 1e-3, 'trg_cls_loss_wt': 1},
+            "SASA": {
+                "domain_loss_wt": 0.7821851095870519,
+                "learning_rate": 0.005,
+                "src_cls_loss_wt": 7.680225091930735,
+                "weight_decay": 0.0001
+            },
+            "MMDA": {
+                "cond_ent_wt": 8.12868726468387,
+                "coral_wt": 7.2734249221691005,
+                "learning_rate": 0.0005,
+                "mmd_wt": 4.967077206689191,
+                "src_cls_loss_wt": 0.30259189730747005,
+                "weight_decay": 0.0001
+            },
+            "AdvSKM": {
+                "domain_loss_wt": 9.377024659182622,
+                "learning_rate": 0.001,
+                "src_cls_loss_wt": 0.7569318345582794,
+                "weight_decay": 0.0001
+            },
+            "HoMM": {
+                "hommd_wt": 6.719563315664067,
+                "learning_rate": 0.001,
+                "src_cls_loss_wt": 1.5584167741262964,
+                "domain_loss_wt": 0.9824,
+                "weight_decay": 0.0001
+            },
+            "Deep_Coral": {
+                "coral_wt": 7.493856538302936,
+                "learning_rate": 0.001,
+                "src_cls_loss_wt": 1.452466194151791,
+                "weight_decay": 0.0001
+            },
+            "DIRT": {
+                "cond_ent_wt": 4.753485587751647,
+                "domain_loss_wt": 7.427507171955081,
+                "learning_rate": 0.001,
+                "src_cls_loss_wt": 9.818770948448943,
+                "vat_loss_wt": 9.609164719194178,
+                "weight_decay": 0.0001
+            },
+            "DSAN": {
+                "learning_rate": 0.005,
+                "mmd_wt": 7.278792967879357,
+                "src_cls_loss_wt": 2.5146121077752395,
+                "domain_loss_wt": 0.16,
+                "weight_decay": 0.0001
+            },
+            "CDAN": {
+                "cond_ent_wt": 0.553637609557987,
+                "domain_loss_wt": 6.759045461432962,
+                "learning_rate": 0.001,
+                "src_cls_loss_wt": 6.854042579661701,
+                "weight_decay": 0.0001
+            },
+            "DDC": {
+                "learning_rate": 0.005,
+                "mmd_wt": 6.701050990813831,
+                "src_cls_loss_wt": 1.1626428404763771,
+                "domain_loss_wt": 0.2048,
+                "weight_decay": 0.0001
+            },
+            "CoDATS": {
+                "domain_loss_wt": 0.6990097136753354,
+                "learning_rate": 0.005,
+                "src_cls_loss_wt": 9.57338373194037,
+                "weight_decay": 0.0001
+            },
+            "DANN": {
+                "domain_loss_wt": 5.221878412210977,
+                "learning_rate": 0.001,
+                "src_cls_loss_wt": 4.233865748743297,
+                "weight_decay": 0.0001,
+                "step_size": 0.0001,
+                "lr_decay": 0.5
+            },
+            'CoTMix': {'learning_rate': 0.001, 'mix_ratio': 0.52, 'temporal_shift': 14,
+                       'src_cls_weight': 0.8, 'src_supCon_weight': 0.1, 'trg_cont_weight': 0.1,
+                       'trg_entropy_weight': 0.05},
+            "MCD": {
+                "learning_rate": 1e-2,
+                "src_cls_loss_wt": 1.0,
+                "domain_loss_wt": 1.0
+            }
         }

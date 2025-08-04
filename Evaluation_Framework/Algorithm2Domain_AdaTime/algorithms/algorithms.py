@@ -3,10 +3,10 @@ import torch.nn as nn
 import numpy as np
 import itertools    
 
-from models.models import classifier, ReverseLayerF, Discriminator, RandomLayer, Discriminator_CDAN, \
+from ..models.models import classifier, ReverseLayerF, Discriminator, RandomLayer, Discriminator_CDAN, \
     codats_classifier, AdvSKM_Disc, CNN_ATTN
-from models.loss import MMD_loss, CORAL, ConditionalEntropyLoss, VAT, LMMD_loss, HoMM_loss, NTXentLoss, SupConLoss
-from utils import EMA
+from ..models.loss import MMD_loss, CORAL, ConditionalEntropyLoss, VAT, LMMD_loss, HoMM_loss, NTXentLoss, SupConLoss
+from ..utils import EMA
 from torch.optim.lr_scheduler import StepLR
 from copy import deepcopy
 import torch.nn. functional as F
@@ -46,9 +46,11 @@ class Algorithm(torch.nn.Module):
             self.training_epoch(src_loader, trg_loader, avg_meter, epoch)
 
             # saving the best model based on src risk
-            if (epoch + 1) % 10 == 0 and avg_meter['Src_cls_loss'].avg < best_src_risk:
+            #if (epoch + 1) % 10 == 0 and avg_meter['Src_cls_loss'].avg < best_src_risk:
+            if avg_meter['Src_cls_loss'].avg < best_src_risk:
                 best_src_risk = avg_meter['Src_cls_loss'].avg
                 best_model = deepcopy(self.network.state_dict())
+                #best_model = self.network.state_dict()
 
 
             logger.debug(f'[Epoch : {epoch}/{self.hparams["num_epochs"]}]')
@@ -65,6 +67,23 @@ class Algorithm(torch.nn.Module):
         raise NotImplementedError
        
 
+    def calculate_loss(self, pred, y):
+        """
+        Calculate the loss for the given source and target data.
+        This method should be overridden by subclasses.
+        """
+        if self.configs.num_cont_output_channels > 0:
+            y = y.float()
+            # flatten y to 2 dimensions from [batch_size, 1 , num_classes] to [batch_size, num_classes]
+            pred = pred.float()
+            y = y.view(y.size(0), -1)
+            src_cls_loss = F.mse_loss(pred, y)
+        else:
+            src_cls_loss = self.cross_entropy(pred, y)
+
+        return src_cls_loss
+
+# TODO make source and target loss flexible to continuous and categorical outputs
 class NO_ADAPT(Algorithm):
     """
     Lower bound: train on source and test on target.
@@ -91,8 +110,7 @@ class NO_ADAPT(Algorithm):
             src_feat = self.feature_extractor(src_x)
             src_pred = self.classifier(src_feat)
 
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
-
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
             loss = src_cls_loss
 
             self.optimizer.zero_grad()
@@ -102,7 +120,7 @@ class NO_ADAPT(Algorithm):
             losses = {'Src_cls_loss': src_cls_loss.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
     
@@ -136,7 +154,7 @@ class TARGET_ONLY(Algorithm):
             trg_feat = self.feature_extractor(trg_x)
             trg_pred = self.classifier(trg_feat)
 
-            trg_cls_loss = self.cross_entropy(trg_pred, trg_y)
+            trg_cls_loss = self.calculate_loss(trg_pred, trg_y)
 
             loss = trg_cls_loss
 
@@ -147,7 +165,7 @@ class TARGET_ONLY(Algorithm):
             losses = {'Trg_cls_loss': trg_cls_loss.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, trg_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -191,7 +209,7 @@ class Deep_Coral(Algorithm):
             src_feat = self.feature_extractor(src_x)
             src_pred = self.classifier(src_feat)
 
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
 
             trg_feat = self.feature_extractor(trg_x)
 
@@ -208,7 +226,7 @@ class Deep_Coral(Algorithm):
                     'coral_loss': coral_loss.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -247,15 +265,16 @@ class MMDA(Algorithm):
             src_x, src_y, trg_x = src_x.to(self.device), src_y.to(self.device), trg_x.to(self.device)
 
             src_feat = self.feature_extractor(src_x)
+
             src_pred = self.classifier(src_feat)
 
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
 
             trg_feat = self.feature_extractor(trg_x)
             src_feat = self.feature_extractor(src_x)
             src_pred = self.classifier(src_feat)
 
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
 
             trg_feat = self.feature_extractor(trg_x)
 
@@ -276,7 +295,7 @@ class MMDA(Algorithm):
                     'cond_ent_wt': cond_ent_loss.item(), 'Src_cls_loss': src_cls_loss.item()}
             
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -340,18 +359,18 @@ class DANN(Algorithm):
             trg_feat = self.feature_extractor(trg_x)
 
             # Task classification  Loss
-            src_cls_loss = self.cross_entropy(src_pred.squeeze(), src_y)
+            src_cls_loss = self.calculate_loss(src_pred.squeeze(), src_y)
 
             # Domain classification loss
             # source
             src_feat_reversed = ReverseLayerF.apply(src_feat, alpha)
             src_domain_pred = self.domain_classifier(src_feat_reversed)
-            src_domain_loss = self.cross_entropy(src_domain_pred, domain_label_src.long())
+            src_domain_loss = self.calculate_loss(src_domain_pred, domain_label_src.long())
 
             # target
             trg_feat_reversed = ReverseLayerF.apply(trg_feat, alpha)
             trg_domain_pred = self.domain_classifier(trg_feat_reversed)
-            trg_domain_loss = self.cross_entropy(trg_domain_pred, domain_label_trg.long())
+            trg_domain_loss = self.calculate_loss(trg_domain_pred, domain_label_trg.long())
 
             # Total domain loss
             domain_loss = src_domain_loss + trg_domain_loss
@@ -366,7 +385,7 @@ class DANN(Algorithm):
             losses =  {'Total_loss': loss.item(), 'Domain_loss': domain_loss.item(), 'Src_cls_loss': src_cls_loss.item()}
            
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -429,7 +448,7 @@ class CDAN(Algorithm):
             # Domain classification loss
             feat_x_pred = torch.bmm(pred_concat.unsqueeze(2), feat_concat.unsqueeze(1)).detach()
             disc_prediction = self.domain_classifier(feat_x_pred.view(-1, pred_concat.size(1) * feat_concat.size(1)))
-            disc_loss = self.cross_entropy(disc_prediction, domain_label_concat)
+            disc_loss = self.calculate_loss(disc_prediction, domain_label_concat)
 
             # update Domain classification
             self.optimizer_disc.zero_grad()
@@ -446,10 +465,10 @@ class CDAN(Algorithm):
             disc_prediction = self.domain_classifier(feat_x_pred.view(-1, pred_concat.size(1) * feat_concat.size(1)))
             # loss of domain discriminator according to fake labels
 
-            domain_loss = self.cross_entropy(disc_prediction, domain_label_concat)
+            domain_loss = self.calculate_loss(disc_prediction, domain_label_concat)
 
             # Task classification  Loss
-            src_cls_loss = self.cross_entropy(src_pred.squeeze(), src_y)
+            src_cls_loss = self.calculate_loss(src_pred.squeeze(), src_y)
 
             # conditional entropy loss.
             loss_trg_cent = self.criterion_cond(trg_pred)
@@ -467,7 +486,7 @@ class CDAN(Algorithm):
                     'cond_ent_loss': loss_trg_cent.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
         self.lr_scheduler.step()
 
 class DIRT(Algorithm):
@@ -529,7 +548,7 @@ class DIRT(Algorithm):
 
             # Domain classification loss
             disc_prediction = self.domain_classifier(feat_concat.detach())
-            disc_loss = self.cross_entropy(disc_prediction, domain_label_concat)
+            disc_loss = self.calculate_loss(disc_prediction, domain_label_concat)
 
             # update Domain classification
             self.optimizer_disc.zero_grad()
@@ -545,10 +564,10 @@ class DIRT(Algorithm):
             disc_prediction = self.domain_classifier(feat_concat)
 
             # loss of domain discriminator according to fake labels
-            domain_loss = self.cross_entropy(disc_prediction, domain_label_concat)
+            domain_loss = self.calculate_loss(disc_prediction, domain_label_concat)
 
             # Task classification  Loss
-            src_cls_loss = self.cross_entropy(src_pred.squeeze(), src_y)
+            src_cls_loss = self.calculate_loss(src_pred.squeeze(), src_y)
 
             # conditional entropy loss.
             loss_trg_cent = self.criterion_cond(trg_pred)
@@ -573,7 +592,7 @@ class DIRT(Algorithm):
                     'cond_ent_loss': loss_trg_cent.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -618,7 +637,7 @@ class DSAN(Algorithm):
             domain_loss = self.loss_LMMD.get_loss(src_feat, trg_feat, src_y, torch.nn.functional.softmax(trg_pred, dim=1))
 
             # calculate source classification loss
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
 
             # calculate the total loss
             loss = self.hparams["domain_loss_wt"] * domain_loss + \
@@ -631,7 +650,7 @@ class DSAN(Algorithm):
             losses =  {'Total_loss': loss.item(), 'LMMD_loss': domain_loss.item(), 'Src_cls_loss': src_cls_loss.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -675,7 +694,7 @@ class HoMM(Algorithm):
             trg_pred = self.classifier(trg_feat)
 
             # calculate source classification loss
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
 
             # calculate lmmd loss
             domain_loss = self.HoMM_loss(src_feat, trg_feat)
@@ -691,7 +710,7 @@ class HoMM(Algorithm):
             losses =  {'Total_loss': loss.item(), 'HoMM_loss': domain_loss.item(), 'Src_cls_loss': src_cls_loss.item()}
             
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -734,7 +753,7 @@ class DDC(Algorithm):
             trg_feat = self.feature_extractor(trg_x)
 
             # calculate source classification loss
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
 
             # calculate mmd loss
             domain_loss = self.mmd_loss(src_feat, trg_feat)
@@ -750,7 +769,7 @@ class DDC(Algorithm):
             losses =  {'Total_loss': loss.item(), 'MMD_loss': domain_loss.item(), 'Src_cls_loss': src_cls_loss.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -813,18 +832,18 @@ class CoDATS(Algorithm):
             trg_feat = self.feature_extractor(trg_x)
 
             # Task classification  Loss
-            src_cls_loss = self.cross_entropy(src_pred.squeeze(), src_y)
+            src_cls_loss = self.calculate_loss(src_pred.squeeze(), src_y)
 
             # Domain classification loss
             # source
             src_feat_reversed = ReverseLayerF.apply(src_feat, alpha)
             src_domain_pred = self.domain_classifier(src_feat_reversed)
-            src_domain_loss = self.cross_entropy(src_domain_pred, domain_label_src.long())
+            src_domain_loss = self.calculate_loss(src_domain_pred, domain_label_src.long())
 
             # target
             trg_feat_reversed = ReverseLayerF.apply(trg_feat, alpha)
             trg_domain_pred = self.domain_classifier(trg_feat_reversed)
-            trg_domain_loss = self.cross_entropy(trg_domain_pred, domain_label_trg.long())
+            trg_domain_loss = self.calculate_loss(trg_domain_pred, domain_label_trg.long())
 
             # Total domain loss
             domain_loss = src_domain_loss + trg_domain_loss
@@ -838,7 +857,7 @@ class CoDATS(Algorithm):
 
             losses =  {'Total_loss': loss.item(), 'Domain_loss': domain_loss.item(), 'Src_cls_loss': src_cls_loss.item()}
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -895,7 +914,7 @@ class AdvSKM(Algorithm):
             self.optimizer_disc.step()
 
             # calculate source classification loss
-            src_cls_loss = self.cross_entropy(src_pred, src_y)
+            src_cls_loss = self.calculate_loss(src_pred, src_y)
 
             # domain loss.
             source_embedding_disc = self.AdvSKM_embedder(src_feat)
@@ -915,7 +934,7 @@ class AdvSKM(Algorithm):
 
             losses =  {'Total_loss': loss.item(), 'MMD_loss': mmd_loss_adv.item(), 'Src_cls_loss': src_cls_loss.item()}
             for key, val in losses.items():
-                    avg_meter[key].update(val, 32)
+                    avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
 
@@ -958,7 +977,7 @@ class SASA(Algorithm):
 
             # source classification loss
             y_pred = self.classifier(src_feature)
-            src_cls_loss = self.cross_entropy(y_pred, src_y)
+            src_cls_loss = self.calculate_loss(y_pred, src_y)
 
             # MMD loss
             domain_loss_intra = self.mmd_loss(src_struct=src_feature,
@@ -977,7 +996,7 @@ class SASA(Algorithm):
             losses =  {'Total_loss': total_loss.item(), 'MMD_loss': domain_loss_intra.item(),
                     'Src_cls_loss': src_cls_loss.item()}
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()
     def mmd_loss(self, src_struct, tgt_struct, weight):
@@ -1030,7 +1049,7 @@ class CoTMix(Algorithm):
 
             # -----------  The two main losses
             # Cross-Entropy loss
-            src_cls_loss = self.cross_entropy(src_orig_logits, src_y)
+            src_cls_loss = self.calculate_loss(src_orig_logits, src_y)
             loss = src_cls_loss * round(self.hparams["src_cls_weight"], 2)
 
             # Target Entropy loss
@@ -1065,7 +1084,7 @@ class CoTMix(Algorithm):
                     'trg_con_loss': trg_con_loss.item()
                     }
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler.step()           
 
@@ -1169,8 +1188,8 @@ class MCD(Algorithm):
             src_pred1 = self.classifier(src_feat)
             src_pred2 = self.classifier2(src_feat)
 
-            src_cls_loss1 = self.cross_entropy(src_pred1, src_y)
-            src_cls_loss2 = self.cross_entropy(src_pred2, src_y)
+            src_cls_loss1 = self.calculate_loss(src_pred1, src_y)
+            src_cls_loss2 = self.calculate_loss(src_pred2, src_y)
 
             loss = src_cls_loss1 + src_cls_loss2
 
@@ -1188,7 +1207,7 @@ class MCD(Algorithm):
             losses = {'Src_cls_loss': loss.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
     def training_epoch(self, src_loader, trg_loader, avg_meter, epoch):
 
@@ -1205,8 +1224,8 @@ class MCD(Algorithm):
             src_pred2 = self.classifier2(src_feat)
 
             # source losses
-            src_cls_loss1 = self.cross_entropy(src_pred1, src_y)
-            src_cls_loss2 = self.cross_entropy(src_pred2, src_y)
+            src_cls_loss1 = self.calculate_loss(src_pred1, src_y)
+            src_cls_loss2 = self.calculate_loss(src_pred2, src_y)
             loss_s = src_cls_loss1 + src_cls_loss2
             
 
@@ -1259,7 +1278,7 @@ class MCD(Algorithm):
             losses =  {'Total_loss': loss.item(), 'MMD_loss': domain_loss.item()}
 
             for key, val in losses.items():
-                avg_meter[key].update(val, 32)
+                avg_meter[key].update(val, src_x.size(0))
 
         self.lr_scheduler_fe.step()
         self.lr_scheduler_c1.step()
