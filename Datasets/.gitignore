@@ -1,0 +1,10 @@
+.DS_Store
+
+data-preprocessing-scripts/data/Weather/*
+data-preprocessing-scripts/data/OhioT1DM/*
+
+data-preprocessing-scripts/ADATIME_data/OHIO/*
+data-preprocessing-scripts/ADATIME_data/Weather/*
+
+data-preprocessing-scripts/OHIOT1DM/sample_csvs/*
+data-preprocessing-scripts/data/OhioT1DM_preprocessed/*

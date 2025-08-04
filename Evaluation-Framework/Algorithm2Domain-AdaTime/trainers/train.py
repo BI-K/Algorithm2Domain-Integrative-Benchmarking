@@ -7,16 +7,16 @@ import wandb
 import pandas as pd
 import numpy as np
 import warnings
-import sklearn.exceptions
+#import sklearn.exceptions
 import collections
 import argparse
 import warnings
 import sklearn.exceptions
 
-from utils import fix_randomness, starting_logs, AverageMeter
-from algorithms.algorithms import get_algorithm_class
-from models.models import get_backbone_class
-from trainers.abstract_trainer import AbstractTrainer
+from ..utils import fix_randomness, starting_logs, AverageMeter
+from ..algorithms.algorithms import get_algorithm_class
+from ..models.models import get_backbone_class
+from ..trainers.abstract_trainer import AbstractTrainer
 warnings.filterwarnings("ignore", category=sklearn.exceptions.UndefinedMetricWarning)
 parser = argparse.ArgumentParser()
        
@@ -30,11 +30,16 @@ class Trainer(AbstractTrainer):
     def __init__(self, args):
         super().__init__(args)
 
-        self.results_columns = ["scenario", "run", "acc", "f1_score", "auroc"]
+        self.results_columns = ["scenario", "run", "acc", "f1_score", "auroc"] + ["mse_" + str(i) for i in range(self.num_cont_output_channels)] + ["rmse_" + str(i) for i in range(self.num_cont_output_channels)] + ["mape_" + str(i) for i in range(self.num_cont_output_channels)]
         self.risks_columns = ["scenario", "run", "src_risk", "few_shot_risk", "trg_risk"]
 
 
-    def fit(self):
+    def fit(self, dataset_configs=None, hparams=None):
+        if dataset_configs is not None:
+            self.dataset_configs = dataset_configs
+        if hparams is not None:
+            # Merge the provided hparams with existing ones to preserve default values
+            self.hparams.update(hparams)
 
         # table with metrics
         table_results = pd.DataFrame(columns=self.results_columns)
@@ -45,6 +50,8 @@ class Trainer(AbstractTrainer):
 
         # Trainer
         for src_id, trg_id in self.dataset_configs.scenarios:
+
+
             for run_id in range(self.num_runs):
                 # fixing random seed
                 fix_randomness(run_id)
@@ -85,7 +92,13 @@ class Trainer(AbstractTrainer):
         self.save_tables_to_file(table_results, 'results')
         self.save_tables_to_file(table_risks, 'risks')
 
-    def test(self):
+    def test(self, dataset_configs=None, hparams=None):
+        if dataset_configs is not None:
+            self.dataset_configs = dataset_configs
+        if hparams is not None:
+            # Merge the provided hparams with existing ones to preserve default values
+            self.hparams.update(hparams)
+
         # Results dataframes
         last_results = pd.DataFrame(columns=self.results_columns)
         best_results = pd.DataFrame(columns=self.results_columns)
@@ -97,7 +110,7 @@ class Trainer(AbstractTrainer):
                 fix_randomness(run_id)
 
                 # Logging
-                self.scenario_log_dir = os.path.join(self.exp_log_dir, src_id + "_to_" + trg_id + "_run_" + str(run_id))
+                self.scenario_log_dir = os.path.join(self.exp_log_dir, str(src_id) + "_to_" + str(trg_id) + "_run_" + str(run_id))
 
                 self.loss_avg_meters = collections.defaultdict(lambda: AverageMeter())
 
@@ -109,7 +122,6 @@ class Trainer(AbstractTrainer):
 
                 # Load chechpoint 
                 last_chk, best_chk = self.load_checkpoint(self.scenario_log_dir)
-
                 # Testing the last model
                 self.algorithm.network.load_state_dict(last_chk)
                 self.evaluate(self.trg_test_dl)
@@ -125,9 +137,10 @@ class Trainer(AbstractTrainer):
                 # Append results to tables
                 best_results = self.append_results_to_tables(best_results, f"{src_id}_to_{trg_id}", run_id,
                                                              best_metrics)
-
-        last_scenario_mean_std = last_results.groupby('scenario')[['acc', 'f1_score', 'auroc']].agg(['mean', 'std'])
-        best_scenario_mean_std = best_results.groupby('scenario')[['acc', 'f1_score', 'auroc']].agg(['mean', 'std'])
+                
+        result_labels = ["acc", "f1_score", "auroc"] + [f"mse_{i}" for i in range(self.num_cont_output_channels)]
+        last_scenario_mean_std = last_results.groupby('scenario')[result_labels].agg(['mean', 'std'])
+        best_scenario_mean_std = best_results.groupby('scenario')[result_labels].agg(['mean', 'std'])
 
 
         # Save tables to file if needed
@@ -141,4 +154,4 @@ class Trainer(AbstractTrainer):
             for key, val in summary.items():
                 print(f'{summary_name}: {key}\t: {val:2.4f}')
 
-
+        return summary_best

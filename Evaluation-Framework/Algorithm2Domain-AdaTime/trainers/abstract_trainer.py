@@ -12,14 +12,14 @@ import sklearn.exceptions
 import collections
 
 from torchmetrics import Accuracy, AUROC, F1Score
-from dataloader.dataloader import data_generator, few_shot_data_generator
-from configs.data_model_configs import get_dataset_class
-from configs.hparams import get_hparams_class
-from configs.sweep_params import sweep_alg_hparams
-from utils import fix_randomness, starting_logs, DictAsObject,AverageMeter
-from algorithms.algorithms import get_algorithm_class
-from models.models import get_backbone_class
-
+from ..dataloader.dataloader import data_generator, few_shot_data_generator
+from ..configs.data_model_configs import get_dataset_class
+from ..configs.hparams import get_hparams_class
+from ..configs.sweep_params import sweep_alg_hparams
+from ..utils import fix_randomness, starting_logs, DictAsObject,AverageMeter
+from ..algorithms.algorithms import get_algorithm_class
+from ..models.models import get_backbone_class
+from ..postprocessing.postprocesser import postprocess
 warnings.filterwarnings("ignore", category=sklearn.exceptions.UndefinedMetricWarning)
 
 class AbstractTrainer(object):
@@ -56,18 +56,31 @@ class AbstractTrainer(object):
 
         # to fix dimension of features in classifier and discriminator networks.
         self.dataset_configs.final_out_channels = self.dataset_configs.tcn_final_out_channles if args.backbone == "TCN" else self.dataset_configs.final_out_channels
+        # to fix dimension of first linear layer in TransformerHinrichs 
+        self.dataset_configs.batch_size = self.hparams_class.train_params["batch_size"]
 
         # Specify number of hparams
         self.hparams = {**self.hparams_class.alg_hparams[self.da_method],
                                 **self.hparams_class.train_params}
+        
 
         # metrics
+        self.num_cont_output_channels = self.dataset_configs.num_cont_output_channels
         self.num_classes = self.dataset_configs.num_classes
-        self.ACC = Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.F1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
-        self.AUROC = AUROC(task="multiclass", num_classes=self.num_classes)        
-
-        # metrics
+        if self.num_classes > 0:
+            self.ACC = Accuracy(task="multiclass", num_classes=self.num_classes)
+            self.F1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.AUROC = AUROC(task="multiclass", num_classes=self.num_classes) 
+            self.MSE = 0   
+            self.RMSE = 0
+            self.MAPE = 0
+        else:
+            self.ACC = 0
+            self.F1 = 0
+            self.AUROC = 0   
+            self.MSE = torch.nn.MSELoss()
+            self.RMSE = lambda x,y : torch.sqrt(self.MSE(x,y))
+            self.MAPE = lambda x, y: torch.mean(torch.abs((x - y) / torch.where(y == 0, torch.ones_like(y), y))) * 100
 
     def sweep(self):
         # sweep configurations
@@ -86,6 +99,8 @@ class AbstractTrainer(object):
         checkpoint = torch.load(os.path.join(self.home_path, model_dir, 'checkpoint.pt'))
         last_model = checkpoint['last']
         best_model = checkpoint['best']
+        if best_model is None:
+            best_model = last_model
         return last_model, best_model
 
     def train_model(self):
@@ -108,19 +123,32 @@ class AbstractTrainer(object):
         feature_extractor.eval()
         classifier.eval()
 
+        # optionally 
+
         total_loss, preds_list, labels_list = [], [], []
 
         with torch.no_grad():
             for data, labels in test_loader:
                 data = data.float().to(self.device)
-                labels = labels.view((-1)).long().to(self.device)
+                if self.num_classes > 0:
+                    labels = labels.long().to(self.device)
+                else:
+                    labels = labels.float().to(self.device)
 
                 # forward pass
                 features = feature_extractor(data)
                 predictions = classifier(features)
+                # postprocessing on ground truth and predictions
+                # predictions = postprocess(predictions)
+                # labels = postprocess(labels)
+
 
                 # compute loss
-                loss = F.cross_entropy(predictions, labels)
+                if self.num_classes > 0:
+                    loss = F.cross_entropy(predictions, labels)
+                else:
+                    labels = labels.view(labels.size(0), -1)  # flatten labels to match predictions
+                    loss = F.mse_loss(predictions, labels)
                 total_loss.append(loss.item())
                 pred = predictions.detach()  # .argmax(dim=1)  # get the index of the max log-probability
 
@@ -138,11 +166,11 @@ class AbstractTrainer(object):
         return dataset_class(), hparams_class()
 
     def load_data(self, src_id, trg_id):
-        self.src_train_dl = data_generator(self.data_path, src_id, self.dataset_configs, self.hparams, "train")
-        self.src_test_dl = data_generator(self.data_path, src_id, self.dataset_configs, self.hparams, "test")
+        self.src_train_dl = data_generator(self.data_path, src_id, self.dataset_configs, self.hparams, "train", is_source=True)
+        self.src_test_dl = data_generator(self.data_path, src_id, self.dataset_configs, self.hparams, "test", is_source=True)
 
-        self.trg_train_dl = data_generator(self.data_path, trg_id, self.dataset_configs, self.hparams, "train")
-        self.trg_test_dl = data_generator(self.data_path, trg_id, self.dataset_configs, self.hparams, "test")
+        self.trg_train_dl = data_generator(self.data_path, trg_id, self.dataset_configs, self.hparams, "train", is_source=True)     
+        self.trg_test_dl = data_generator(self.data_path, trg_id, self.dataset_configs, self.hparams, "test", is_source=True)
 
         self.few_shot_dl_5 = few_shot_data_generator(self.trg_test_dl, self.dataset_configs,
                                                      5)  # set 5 to other value if you want other k-shot FST
@@ -169,9 +197,12 @@ class AbstractTrainer(object):
         auroc = self.AUROC(self.full_preds.cpu(), self.full_labels.cpu()).item()
         # f1_sk learn
         # f1 = f1_score(self.full_preds.argmax(dim=1).cpu().numpy(), self.full_labels.cpu().numpy(), average='macro')
+        mse = self.MSE(self.full_preds.cpu(), self.full_labels.cpu()).item()
+        rmse = self.RMSE(self.full_preds.cpu(), self.full_labels.cpu()).item()
+        mape = self.MAPE(self.full_preds.cpu(), self.full_labels.cpu()).item()
 
         risks = src_risk, fst_risk, trg_risk
-        metrics = acc, f1, auroc
+        metrics = acc, f1, auroc, mse, rmse, mape
 
         return risks, metrics
 
@@ -232,14 +263,28 @@ class AbstractTrainer(object):
     def calculate_metrics(self):
        
         self.evaluate(self.trg_test_dl)
-        # accuracy  
-        acc = self.ACC(self.full_preds.argmax(dim=1).cpu(), self.full_labels.cpu()).item()
-        # f1
-        f1 = self.F1(self.full_preds.argmax(dim=1).cpu(), self.full_labels.cpu()).item()
-        # auroc 
-        auroc = self.AUROC(self.full_preds.cpu(), self.full_labels.cpu()).item()
+        if self.num_classes > 0:
+            # accuracy  
+            acc = self.ACC(self.full_preds.argmax(dim=1).cpu(), self.full_labels.cpu()).item()
+            # f1
+            f1 = self.F1(self.full_preds.argmax(dim=1).cpu(), self.full_labels.cpu()).item()
+            # auroc 
+            auroc = self.AUROC(self.full_preds.cpu(), self.full_labels.cpu()).item()
 
-        return acc, f1, auroc
+            mses = [0 for _ in range(self.num_cont_output_channels)]
+            rmses = [0 for _ in range(self.num_cont_output_channels)]
+            mapes = [0 for _ in range(self.num_cont_output_channels)]
+            
+        else:
+            acc = 0
+            f1 = 0
+            auroc = 0
+            self.full_labels = self.full_labels.squeeze(1)  # remove the second dimension
+            mses = [self.MSE(self.full_preds[:, i].cpu(), self.full_labels[:,  i].cpu()).item() for i in range(self.num_cont_output_channels)]
+            rmses = [self.RMSE(self.full_preds[:, i].cpu(), self.full_labels[:,  i].cpu()).item() for i in range(self.num_cont_output_channels)]
+            mapes = [self.MAPE(self.full_preds[:, i].cpu(), self.full_labels[:,  i].cpu()).item() for i in range(self.num_cont_output_channels)]
+
+        return acc, f1, auroc, *mses, *rmses, *mapes
 
     def calculate_risks(self):
          # calculation based source test data
@@ -283,6 +328,7 @@ class AbstractTrainer(object):
         format_func = lambda x: f"{x:.4f}" if isinstance(x, float) else x
 
         # Apply the formatting function to each element in the tables
-        table = table.applymap(format_func)
+        table = table.map(format_func)
+        #table = table.applymap(format_func)
 
         return table 

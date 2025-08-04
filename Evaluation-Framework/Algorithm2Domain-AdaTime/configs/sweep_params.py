@@ -9,6 +9,16 @@ sweep_train_hparams = {
         'optimizer':    {'values': ['adam']},
 }
 sweep_alg_hparams = {
+        'TARGET_ONLY': {
+            'learning_rate':    {'values': [1e-2, 5e-3, 1e-3, 5e-4]},
+            'src_cls_loss_wt':  {'distribution': 'uniform', 'min': 1e-1, 'max': 10},
+            'domain_loss_wt':   {'distribution': 'uniform', 'min': 1e-2, 'max': 10}
+        },
+        'NO_ADAPT': {
+            'learning_rate':    {'values': [1e-2, 5e-3, 1e-3, 5e-4]},
+            'src_cls_loss_wt':  {'distribution': 'uniform', 'min': 1e-1, 'max': 10},
+            'domain_loss_wt':   {'distribution': 'uniform', 'min': 1e-2, 'max': 10}
+        },
         'DANN': {
             'learning_rate':    {'values': [1e-2, 5e-3, 1e-3, 5e-4]},
             'src_cls_loss_wt':  {'distribution': 'uniform', 'min': 1e-1, 'max': 10},
@@ -65,7 +75,7 @@ sweep_alg_hparams = {
         'DSAN': {
             'learning_rate':    {'values': [1e-2, 5e-3, 1e-3, 5e-4]},
             'src_cls_loss_wt':  {'distribution': 'uniform', 'min': 1e-1, 'max': 10},
-            'mmd_wt':           {'distribution': 'uniform', 'min': 1e-2, 'max': 10},
+            'mmd_wt':           {'distribution': 'uniform', 'min': 1e-2, 'max': 10}
         },
 
         'DDC': {
@@ -91,3 +101,45 @@ sweep_alg_hparams = {
         },
 }
 
+def get_sweep_train_hparams(ui_hparams=None):
+    """
+    Get sweep training hyperparameters.
+    If ui_hparams is provided (from hyperparameter tuning UI), use those values.
+    Otherwise, use the default sweep_train_hparams.
+    """
+    if ui_hparams is None:
+        return sweep_alg_hparams
+    
+    # Start with default sweep_train_hparams
+    merged_hparams = sweep_train_hparams.copy()
+    
+    # Update with UI values if provided
+    for param_name, param_config in ui_hparams.items():
+        if param_name in merged_hparams:
+            # Ensure the format matches what sweep expects
+            if isinstance(param_config, dict) and "values" in param_config:
+                merged_hparams[param_name] = param_config
+            else:
+                # Convert to proper format if needed
+                merged_hparams[param_name] = {"values": param_config}
+    
+    return merged_hparams
+
+def get_combined_sweep_hparams(ui_hparams=None, algorithm=None):
+    """
+    Get combined sweep hyperparameters including both training and algorithm-specific parameters.
+    If ui_hparams is provided (from hyperparameter tuning UI), use those values for training params.
+    """
+    # Get training hyperparameters (with UI overrides if provided)
+    training_hparams = get_sweep_train_hparams(ui_hparams)
+    
+    # Get algorithm-specific hyperparameters
+    alg_hparams = {}
+    if algorithm and algorithm in sweep_alg_hparams:
+        alg_hparams = sweep_alg_hparams[algorithm].copy()
+    
+    # Combine both sets of hyperparameters
+    # Training parameters (especially from UI) take precedence over algorithm-specific ones
+    combined_hparams = {**alg_hparams, **training_hparams}
+    
+    return combined_hparams

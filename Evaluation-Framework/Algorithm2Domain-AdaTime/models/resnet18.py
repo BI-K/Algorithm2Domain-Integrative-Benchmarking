@@ -114,10 +114,12 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
+        
         self.layer4 = self._make_layer(block, configs.final_out_channels, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
 
-        self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.avgpool = nn.AdaptiveAvgPool1d(configs.features_len)
+
+        #self.fc = nn.Linear(configs.features_len, 512 * block.expansion)
 
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
@@ -190,8 +192,8 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
-        # x = torch.flatten(x, 1)
-        # x = self.fc(x)
+        #x = torch.flatten(x, 1)
+        #x = self.fc(x)
 
         return x
 

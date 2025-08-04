@@ -46,7 +46,11 @@ class VAT(nn.Module):
         return qlogq - qlogp
 
     def get_normalized_vector(self, d):
-        return F.normalize(d.view(d.size(0), -1), p=2, dim=1).reshape(d.size())
+        return F.normalize(d.reshape(d.size(0), -1), p=2, dim=1).reshape(d.size())
+        # chose to go with reshape, since all previous existing models fulfill the contiguous condition, 
+        # using reshape this code is also compatible with the newly added LTCN model, 
+        # without breaking any previous functionality
+        #return F.normalize(d.view(d.size(0), -1), p=2, dim=1).reshape(d.size())
 
     def virtual_adversarial_loss(self, x, logit):
         r_vadv = self.generate_virtual_adversarial_perturbation(x, logit)
