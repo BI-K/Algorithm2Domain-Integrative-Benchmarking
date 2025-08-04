@@ -1,0 +1,6 @@
+
+wandb/
+experiments_logs/
+data/
+*.pyc
+main.py
