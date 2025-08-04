@@ -35,6 +35,7 @@ class Trainer(AbstractTrainer):
 
 
     def fit(self, dataset_configs=None, hparams=None):
+        print("Training started...")
         if dataset_configs is not None:
             self.dataset_configs = dataset_configs
         if hparams is not None:

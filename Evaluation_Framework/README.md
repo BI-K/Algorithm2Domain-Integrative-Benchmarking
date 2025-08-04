@@ -22,7 +22,18 @@ TODO
 
 ## Setup
 
-Please use Python Version 3.10
+Install torch as required by your computers setup, for me it was:
+```
+torch==2.7.1+cu126
+torchaudio==2.7.1+cu126
+torchmetrics==1.8.0
+torchvision==0.22.1+cu126
+```
+
+The install all other packages as specified in the requirements.txt:
+```pip install -r requirements.txt```
+
+
 
 ## How to Start Evaluation Framework
 

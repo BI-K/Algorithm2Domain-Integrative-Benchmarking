@@ -28,6 +28,7 @@ class AbstractTrainer(object):
     """
 
     def __init__(self, args):
+
         self.da_method = args.da_method  # Selected  DA Method
         self.dataset = args.dataset  # Selected  Dataset
         self.backbone = args.backbone
@@ -46,13 +47,17 @@ class AbstractTrainer(object):
         os.makedirs(self.exp_log_dir, exist_ok=True)
 
 
-
-
         # Specify runs
         self.num_runs = args.num_runs
 
         # get dataset and base model configs
         self.dataset_configs, self.hparams_class = self.get_configs()
+
+
+        # Perform validity checks on arguments - e.g. do not apply da methods for classification tasks to continuous prediction tasks
+        # DSAN, 
+        if self.dataset_configs.num_classes == 0 and self.da_method in ["DSAN"]:
+            raise ValueError(f"{self.da_method} not applicable for continuous prediction tasks. Please select a different DA method.")
 
         # to fix dimension of features in classifier and discriminator networks.
         self.dataset_configs.final_out_channels = self.dataset_configs.tcn_final_out_channles if args.backbone == "TCN" else self.dataset_configs.final_out_channels
@@ -308,7 +313,11 @@ class AbstractTrainer(object):
         results_df = pd.DataFrame([results_row], columns=table.columns)
 
         # Concatenate new dataframes with original dataframes
-        table = pd.concat([table, results_df], ignore_index=True)
+        # Check if table is empty to avoid FutureWarning
+        if table.empty:
+            table = results_df.copy()
+        else:
+            table = pd.concat([table, results_df], ignore_index=True)
 
         return table
     
@@ -322,7 +331,10 @@ class AbstractTrainer(object):
         std_metrics_df = pd.DataFrame([['std', '-', *std_metrics]], columns=columns)
 
         # Concatenate original dataframes with mean and std dataframes
-        table = pd.concat([table, mean_metrics_df, std_metrics_df], ignore_index=True)
+        if table.empty:
+            table = pd.concat([mean_metrics_df, std_metrics_df], ignore_index=True)
+        else:
+            table = pd.concat([table, mean_metrics_df, std_metrics_df], ignore_index=True)
 
         # Create a formatting function to format each element in the tables
         format_func = lambda x: f"{x:.4f}" if isinstance(x, float) else x

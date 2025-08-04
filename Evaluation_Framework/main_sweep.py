@@ -1,7 +1,7 @@
-from Algorithm2Domain-ADATime.trainers.sweep import Trainer
-from Algorithm2Domain-ADATime.configs.data_model_configs import get_dataset_class
-from Algorithm2Domain-ADATime.configs.hparams import get_hparams_class
-from Algorithm2Domain-ADATime.configs.sweep_params import get_sweep_train_hparams, get_combined_sweep_hparams
+from Algorithm2Domain_AdaTime.trainers.sweep import Trainer
+from Algorithm2Domain_AdaTime.configs.data_model_configs import get_dataset_class
+from Algorithm2Domain_AdaTime.configs.hparams import get_hparams_class
+from Algorithm2Domain_AdaTime.configs.sweep_params import get_sweep_train_hparams, get_combined_sweep_hparams
 import argparse
 parser = argparse.ArgumentParser()
 
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', default='HAR', type=str, help='Dataset of choice: (WISDM - EEG - HAR - HHAR_SA - PHD)')
 
     # ========= Select the BACKBONE ==============
-    parser.add_argument('--backbone', default='CNN', type=str, help='Backbone of choice: (CNN - RESNET18 - TCN)')
+    parser.add_argument('--backbone', default='CNN', type=str, help='Backbone of choice: (CNN - RESNET18 - TCN - TCN - CfCN - GRUHinrichs - TransformerHinrichs)')
 
     # ========= Experiment settings ===============
     parser.add_argument('--num_runs', default=1, type=int, help='Number of consecutive run with different seeds')
