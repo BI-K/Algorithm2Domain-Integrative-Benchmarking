@@ -1,0 +1,67 @@
+/* style.css */
+.header {
+    text-align: center;
+    padding: 2rem 1rem;
+    background: linear-gradient(45deg, #2c3e50, #3498db);
+    color: white;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.progress-tracker {
+    display: flex;
+    justify-content: space-between;
+    margin: 2rem 0;
+    gap: 1rem;
+}
+
+.step {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    background: #f0f2f6;
+    color: #7f8c8d;
+    border-radius: 8px;
+    margin: 0 2px;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    background: #3498db;
+    color: white;
+    transform: scale(1.05);
+}
+
+.stMetric {
+    border: 1px solid #dfe6e9 !important;
+    border-radius: 10px !important;
+    padding: 15px !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.st-bd {
+    border-radius: 15px !important;
+}
+
+.stButton button {
+    transition: all 0.3s ease !important;
+    border-radius: 8px !important;
+}
+
+.stButton button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2) !important;
+}
+
+.st-emotion-cache-4rp1ik {
+    display: none;
+}
+
+.st-emotion-cache-1oh4ihc {
+    display: none;
+}
+
+
+.css-pxxe24 {
+    visibility: hidden;
+}
